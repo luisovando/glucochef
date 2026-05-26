@@ -1,0 +1,208 @@
+// GlucoChef — C4 model (Context, Container, Component) for the MVP.
+// One file, multiple views. Each view answers a single question.
+// Conventions: skills/glucochef-c4-architecture/SKILL.md.
+
+specification {
+  element actor
+  element system
+  element container
+  element component
+
+  tag phi       // stores or processes Protected Health Information
+  tag external  // outside GlucoChef's trust boundary
+  tag deferred  // v2 scope; must not appear in any MVP view
+}
+
+model {
+  patient = actor 'Patient' {
+    description 'Adult (18+) with Type 1, Type 2, or gestational diabetes managing diet and labs.'
+  }
+
+  cognito = system 'AWS Cognito' {
+    #external
+    description 'Managed user pool: sign-up, email verification, sign-in, JWT issuance.'
+  }
+
+  aiProvider = system 'AI Provider (OpenAI / Claude)' {
+    #external
+    description 'LLM API used for ingredient alternatives and recipe generation. Receives no raw PHI.'
+  }
+
+  glucochef = system 'GlucoChef' {
+    description 'Mobile-first PWA that pairs personalised nutrition with traffic-light lab interpretation.'
+
+    pwa = container 'PWA Frontend' {
+      technology 'Next.js 14 · React · TypeScript · Service Worker'
+      description 'Installable mobile-first PWA. Renders onboarding, suggestions, recipes, and lab trends.'
+
+      authUi = component 'Auth UI' within pwa {
+        technology 'app/(auth)/*'
+        description 'Sign-up, email confirmation, sign-in screens that talk to Cognito via the API.'
+      }
+      onboardingUi = component 'Onboarding Flow' within pwa {
+        #phi
+        technology 'app/(onboarding)/*'
+        description 'Multi-step guided form for diagnosis, allergies, intolerances, rejections, preferences, and consent.'
+      }
+      suggestionsUi = component 'Suggestions Screen' within pwa {
+        technology 'app/suggestions/*'
+        description 'Requests alternatives, lets the patient accept or reject ingredients.'
+      }
+      recipeUi = component 'Recipe Screen' within pwa {
+        technology 'app/recipes/*'
+        description 'Displays generated recipes (title, ingredients, steps, nutrition summary, badges).'
+      }
+      labsUi = component 'Labs Screen' within pwa {
+        #phi
+        technology 'app/labs/*'
+        description 'Manual lab entry form and trend view with traffic-light cards.'
+      }
+      apiClient = component 'API Client' within pwa {
+        technology 'lib/api · fetch · JWT bearer'
+        description 'Typed client that attaches Cognito JWT to every API call.'
+      }
+      pwaShell = component 'PWA Shell & Service Worker' within pwa {
+        technology 'next-pwa · workbox · manifest.json'
+        description 'Manifest, splash, install prompt. Caches static assets only; never caches PHI routes.'
+      }
+    }
+
+    api = container 'Backend API' {
+      #phi
+      technology 'FastAPI · Python 3.12 · Uvicorn'
+      description 'HTTP API exposing onboarding, suggestions, recipes, labs, and audit endpoints.'
+
+      authAdapter = component 'Auth Adapter' within api {
+        technology 'app/auth/cognito.py'
+        description 'Verifies Cognito JWTs (JWKS) and resolves the patient context for each request.'
+      }
+      profileSvc = component 'Profile Service' within api {
+        #phi
+        technology 'app/profile/'
+        description 'Persists nutritional profile (diagnosis, allergies, intolerances, rejections, preferences, consent).'
+      }
+      suggestionSvc = component 'Suggestion Service' within api {
+        #phi
+        technology 'app/suggestions/'
+        description 'Builds prompts from the profile and latest labs, calls the AI provider, filters allergens and rejections.'
+      }
+      recipeSvc = component 'Recipe Service' within api {
+        #phi
+        technology 'app/recipes/'
+        description 'Generates a recipe from accepted ingredients; applies carb-restricted policy when latest HbA1c is red.'
+      }
+      labSvc = component 'Lab Service' within api {
+        #phi
+        technology 'app/labs/'
+        description 'Validates and stores lab entries; computes traffic-light status and trend over the latest three entries.'
+      }
+      correlationSvc = component 'Correlation Policy' within api {
+        technology 'app/correlation/'
+        description 'Pure policy module: maps the latest lab traffic-light state to suggestion and recipe constraints.'
+      }
+      cryptoSvc = component 'PHI Crypto Service' within api {
+        #phi
+        technology 'app/security/crypto.py · AES-256-GCM'
+        description 'Field-level encryption and decryption for PHI columns. Key sourced from AWS KMS.'
+      }
+      auditSvc = component 'Audit Log Service' within api {
+        technology 'app/security/audit.py'
+        description 'Writes (actor, action, resource, timestamp, outcome) for every PHI read, write, and denied access.'
+      }
+    }
+
+    db = container 'PostgreSQL Database' {
+      #phi
+      technology 'AWS RDS PostgreSQL · t3.micro'
+      description 'Stores patient accounts, nutritional profiles, lab entries, recipes, and the audit log. PHI columns are AES-256 ciphertext.'
+    }
+
+    // v2 scope — modelled but excluded from MVP views.
+    pdfParser = container 'PDF Lab Parser' {
+      #deferred
+      technology 'v2'
+      description 'Automatic ingestion of lab result PDFs. Deferred per product-doc §6.2.'
+    }
+    mealPlanner = container 'Weekly Meal Planner' {
+      #deferred
+      technology 'v2'
+      description 'Multi-day meal optimisation. Deferred per product-doc §6.2.'
+    }
+  }
+
+  // Relationships — context level
+  patient -> glucochef 'Manages diet and labs through the PWA'
+  glucochef -> cognito 'Delegates authentication and email verification'
+  glucochef -> aiProvider 'Requests ingredient alternatives and recipes'
+
+  // Relationships — container level
+  patient -> pwa 'Uses on a mobile browser; installs to home screen'
+  pwa -> api 'HTTPS · JSON · Cognito JWT bearer'
+  pwa -> cognito 'Sign-up, confirm, sign-in (Hosted UI / SDK)'
+  api -> cognito 'Verifies JWTs against JWKS'
+  api -> db 'SQL over TLS · PHI fields encrypted at rest'
+  api -> aiProvider 'HTTPS · prompt with de-identified profile fragments'
+
+  // Relationships — backend components
+  authAdapter -> cognito 'JWKS fetch · token verification'
+  profileSvc -> cryptoSvc 'Encrypts allergies, rejections, diagnosis on write'
+  profileSvc -> auditSvc 'Logs profile create / update events'
+  profileSvc -> db 'CRUD nutritional_profile'
+  suggestionSvc -> profileSvc 'Reads profile context'
+  suggestionSvc -> labSvc 'Reads latest traffic-light state'
+  suggestionSvc -> correlationSvc 'Resolves carb policy from latest labs'
+  suggestionSvc -> aiProvider 'Prompted call · no raw PHI'
+  suggestionSvc -> auditSvc 'Logs suggestion request'
+  recipeSvc -> profileSvc 'Reads accepted ingredients and preferences'
+  recipeSvc -> correlationSvc 'Resolves carb policy from latest labs'
+  recipeSvc -> aiProvider 'Prompted call · no raw PHI'
+  recipeSvc -> db 'Persists generated recipe'
+  recipeSvc -> auditSvc 'Logs recipe generation'
+  labSvc -> cryptoSvc 'Encrypts HbA1c, glucose, cholesterol, triglycerides'
+  labSvc -> db 'CRUD lab_entry'
+  labSvc -> auditSvc 'Logs lab read / write'
+  correlationSvc -> labSvc 'Reads latest traffic-light state'
+
+  // Relationships — frontend components
+  authUi -> apiClient 'Auth requests'
+  onboardingUi -> apiClient 'Submit profile + consent'
+  suggestionsUi -> apiClient 'Request alternatives · accept · reject'
+  recipeUi -> apiClient 'Generate · open recipe'
+  labsUi -> apiClient 'Submit lab entry · fetch trends'
+  apiClient -> api 'HTTPS · JWT bearer'
+  pwaShell -> pwa 'Manifest, splash, install lifecycle'
+}
+
+views {
+
+  view l1_context {
+    title 'L1 — Who uses GlucoChef and which external systems does it depend on?'
+    include patient, glucochef, cognito, aiProvider
+    exclude element.tag == #deferred
+  }
+
+  view l2_containers {
+    title 'L2 — Which runtime containers make up GlucoChef?'
+    include patient, pwa, api, db, cognito, aiProvider
+    exclude element.tag == #deferred
+  }
+
+  view l3_backend of api {
+    title 'L3 — How is the FastAPI backend structured internally?'
+    include *
+    exclude element.tag == #deferred
+  }
+
+  view l3_frontend of pwa {
+    title 'L3 — How is the Next.js PWA structured internally?'
+    include *
+    exclude element.tag == #deferred
+  }
+
+  view phi_boundary {
+    title 'PHI Boundary — Which elements store or process Protected Health Information?'
+    include element.tag == #phi
+    include patient, cognito, aiProvider
+    exclude element.tag == #deferred
+  }
+}
