@@ -1,6 +1,6 @@
 ---
 name: glucochef-conventions
-description: Foundational product context and conventions for GlucoChef: stack decisions, MVP scope (included and deferred), product principles, security baseline, terminology, anti-patterns, and process discipline. Always consult this skill before generating or reviewing any GlucoChef artifact (Product Doc, user stories, architecture, ERD, code, tests, CI/CD) so all outputs stay consistent with decisions already made.
+description: Foundational product context and conventions for GlucoChef - stack decisions, MVP scope (included and deferred), product principles, security baseline, terminology, anti-patterns, and process discipline. Always consult this skill before generating or reviewing any GlucoChef artifact (Product Doc, user stories, architecture, ERD, code, tests, CI/CD) so all outputs stay consistent with decisions already made.
 ---
 
 # GlucoChef — Product Conventions
