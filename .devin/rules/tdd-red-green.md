@@ -2,8 +2,14 @@
 trigger: model_decision
 ---
 
-**Scope:** All backend phases (Phases 0–13, 22) and any phase whose acceptance
-criteria include a Pytest or Playwright command.
+**Scope**: Backend phases with Pytest ACs (Phases 4–13, 22) and frontend phases
+with Playwright ACs (Phases 16–20, 23).
+
+**Exceptions — shell ACs only, no TDD cycle required**:
+
+Phases 0–3 (scaffolding, bootstrap, DB, models): verify with shell commands only
+Phases 14, 15, 21 (frontend bootstrap, Cognito UI, PWA): verify with build commands and manual checks
+Phases 24–25 (CI, deploy): verify with pipeline triggers and URL smoke tests
 
 ---
 

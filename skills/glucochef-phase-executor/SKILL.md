@@ -43,7 +43,7 @@ Do not write a single line of code before completing this step.
 1. Read `CLAUDE.md` — full file, every section
 2. Read `docs/glucochef-prd.md § Phase {N}` — goal, dependencies, steps, ACs, do-not-change
 3. Read `skills/glucochef-conventions/SKILL.md` — stack invariants and anti-patterns
-4. Read `.windsurf/rules/tdd-red-green.md` (backend and frontend phases with test ACs)
+4. Read `.devin/rules/tdd-red-green.md` (backend and frontend phases with test ACs)
 5. **If Phase N touches PHI columns, auth, or audit log:** also read `skills/hipaa-compliance/SKILL.md`
 
 PHI-touching phases: 3 (models placeholder), 4 (JWT), 5 (encryption + audit), 6 (onboarding), 11 (lab registration), 12 (trends).
@@ -131,7 +131,7 @@ Run the AC verification command and report the exact output.
 Run each command listed under "Acceptance Criteria" in the PRD phase.
 Report each result:
 
-```
+```text
 AC 1: {command}
 → Output: {actual output}
 → Status: ✅ PASS / ❌ FAIL / ⚠️ Manual
@@ -171,7 +171,7 @@ If any protected file appears in `git diff --name-only`:
 
 ## Step 5 — Output report and propose git artifacts
 
-```
+```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Phase {N} — {LINEAR-ID} — {GOAL}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
