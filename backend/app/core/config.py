@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     debug: bool = False
     environment: str = "development"
     database_url: str  # Required — set via DATABASE_URL in .env or environment
+    # Kept separate from debug: SQL echo logs bind parameters which may contain PHI.
+    # Never enable in staging or production.
+    sql_echo: bool = False
 
 
 settings = Settings()
