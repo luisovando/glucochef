@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     app_name: str = "GlucoChef Backend"
     debug: bool = False
     environment: str = "development"
-    database_url: str = "postgresql+asyncpg://glucochef:glucochef@localhost:5432/glucochef"
+    database_url: str  # Required — set via DATABASE_URL in .env or environment
 
 
 settings = Settings()
