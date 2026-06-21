@@ -1,5 +1,9 @@
+from collections.abc import AsyncGenerator
+
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import event
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import Session
 
 from app.db.base import Base
 import app.models  # noqa: F401 — registers all ORM models with Base.metadata
@@ -17,20 +21,32 @@ async def engine():
 
 
 @pytest_asyncio.fixture
-async def db_session(engine) -> AsyncSession:
+async def db_session(engine) -> AsyncGenerator[AsyncSession, None]:
     """
     Yields a session whose writes are always rolled back after each test.
 
-    Uses a connection-level SAVEPOINT so that calling session.commit() inside
-    a test does not permanently persist data. After the test the outer
-    transaction is rolled back, leaving the in-memory DB clean for the next test.
+    Pattern:
+      - Outer BEGIN wraps the entire test.
+      - An initial SAVEPOINT is opened before yielding the session.
+      - An `after_transaction_end` listener re-opens the SAVEPOINT each time
+        the session commits (which releases the previous one), so mid-test
+        commits are visible within the session but never escape to the DB.
+      - The outer transaction is rolled back in the finally block, leaving the
+        in-memory DB clean for the next test.
     """
     async with engine.connect() as conn:
         trans = await conn.begin()
-        # Wrap in a SAVEPOINT so nested commits don't escape to the outer transaction.
-        await conn.begin_nested()
+        await conn.begin_nested()  # open initial SAVEPOINT
 
         session = AsyncSession(bind=conn, expire_on_commit=False)
+
+        @event.listens_for(session.sync_session, "after_transaction_end")
+        def _restart_savepoint(sess: Session, transaction) -> None:
+            # Re-open the SAVEPOINT after each commit so the next commit also
+            # stays within the outer transaction boundary.
+            if transaction.nested and not transaction._parent.nested:
+                sess.begin_nested()
+
         try:
             yield session
         finally:
