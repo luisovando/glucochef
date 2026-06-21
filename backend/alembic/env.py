@@ -27,6 +27,8 @@ target_metadata = Base.metadata
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode (no live DB connection needed)."""
     url = config.get_main_option("sqlalchemy.url")
+    # Replace async driver with sync driver for offline mode
+    url = url.replace("postgresql+asyncpg://", "postgresql://")
     context.configure(
         url=url,
         target_metadata=target_metadata,
