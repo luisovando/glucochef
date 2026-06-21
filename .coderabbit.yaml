@@ -23,4 +23,4 @@ reviews:
   high_level_summary: true
   poem: false                       # disable the poem that generates at the end
 
-path_filters: ["!memory-bank/**", "!docs/**", "!skills/**", "!*.md", "!.windsurf/**", "!.devin/**"]
+path_filters: ["!memory-bank/**", "!docs/**", "!skills/**", "!**/*.md", "!.windsurf/**", "!.devin/**"]
