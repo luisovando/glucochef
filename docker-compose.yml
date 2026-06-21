@@ -2,10 +2,15 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      # Values are read from the root .env file (same directory as this file).
+      # Copy .env.example → .env and fill in real values before running.
+      # Omitting any of these will cause postgres to start with a blank value
+      # and the backend will fail to connect with an authentication error.
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is not set — copy .env.example to .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set — copy .env.example to .env}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is not set — copy .env.example to .env}
     ports:
+      # Bound to localhost only — not reachable from other hosts on the network.
       - "127.0.0.1:5432:5432"
     volumes:
       - glucochef_pg:/var/lib/postgresql/data
