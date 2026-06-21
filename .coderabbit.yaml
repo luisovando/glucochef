@@ -1,0 +1,26 @@
+# CodeRabbit configuration for GlucoChef
+# Docs: https://docs.coderabbit.ai/getting-started/configure-coderabbit
+
+reviews:
+  # Trigger reviews on PRs targeting any of these base branches
+  base_branches:
+    - main
+    - "feature/coding-laor"
+
+  # Review profile: chill = suggestivo, assertive = bloquea on issues
+  profile: "chill"
+
+  # Auto-review on every push to an open PR
+  auto_review:
+    enabled: true
+    drafts: false          # skip reviews on draft PRs
+    base_branches:
+      - main
+      - "feature/coding-laor"
+
+  # What to include in the review
+  request_changes_workflow: false   # don't block merges on issues in an academic repo
+  high_level_summary: true
+  poem: false                       # disable the poem that generates at the end
+
+  path_filters: ["!memory-bank/**", "!docs/**", "!skills/**", "!**/*.md", "!.windsurf/**", "!.devin/**"]
