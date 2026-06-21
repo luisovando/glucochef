@@ -1,11 +1,9 @@
 """Phase 3 AC: Pytest fixture can insert a Patient row."""
-import pytest
 from sqlalchemy import select
 
 from app.models.patient import Patient
 
 
-@pytest.mark.asyncio
 async def test_insert_patient(db_session):
     patient = Patient(
         cognito_sub="test-sub-001",

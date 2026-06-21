@@ -1,37 +1,37 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, String, Text, Uuid
+from sqlalchemy import DateTime, ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.base import Base
-
-# EncryptedString placeholder — replaced by the real Fernet TypeDecorator in Phase 5.
-EncryptedString = Text
+from app.core.crypto import EncryptedString
 
 
 class NutritionalProfile(Base):
     __tablename__ = "nutritional_profiles"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid, primary_key=True, default=uuid.uuid4
     )
     patient_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+        Uuid,
         ForeignKey("patients.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
         index=True,
     )
-    # PHI columns — EncryptedString placeholder
+    # PHI columns — EncryptedString placeholder (Phase 5 replaces with Fernet TypeDecorator)
     diabetes_type: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
-    diagnosis_date: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
+    diagnosis_date: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)  # encrypted date; deserialize in Phase 5
     additional_notes: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        nullable=False, server_default=func.now(), onupdate=func.now()
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
     patient: Mapped["Patient"] = relationship(back_populates="nutritional_profile")  # noqa: F821
@@ -53,10 +53,10 @@ class Medication(Base):
     __tablename__ = "medications"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid, primary_key=True, default=uuid.uuid4
     )
     nutritional_profile_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+        Uuid,
         ForeignKey("nutritional_profiles.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -65,7 +65,9 @@ class Medication(Base):
     name: Mapped[str] = mapped_column(EncryptedString, nullable=False)
     dosage: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     nutritional_profile: Mapped["NutritionalProfile"] = relationship(back_populates="medications")
 
@@ -74,10 +76,10 @@ class Allergy(Base):
     __tablename__ = "allergies"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid, primary_key=True, default=uuid.uuid4
     )
     nutritional_profile_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+        Uuid,
         ForeignKey("nutritional_profiles.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -86,7 +88,9 @@ class Allergy(Base):
     substance: Mapped[str] = mapped_column(EncryptedString, nullable=False)
     severity: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     nutritional_profile: Mapped["NutritionalProfile"] = relationship(back_populates="allergies")
 
@@ -95,10 +99,10 @@ class Intolerance(Base):
     __tablename__ = "intolerances"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid, primary_key=True, default=uuid.uuid4
     )
     nutritional_profile_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+        Uuid,
         ForeignKey("nutritional_profiles.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -106,7 +110,9 @@ class Intolerance(Base):
     # PHI column — EncryptedString placeholder
     substance: Mapped[str] = mapped_column(EncryptedString, nullable=False)
 
-    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     nutritional_profile: Mapped["NutritionalProfile"] = relationship(back_populates="intolerances")
 
@@ -115,10 +121,10 @@ class DietaryPreference(Base):
     __tablename__ = "dietary_preferences"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid, primary_key=True, default=uuid.uuid4
     )
     nutritional_profile_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+        Uuid,
         ForeignKey("nutritional_profiles.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -126,7 +132,9 @@ class DietaryPreference(Base):
     # Not PHI — cultural/dietary tag
     preference: Mapped[str] = mapped_column(String(256), nullable=False)
 
-    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     nutritional_profile: Mapped["NutritionalProfile"] = relationship(
         back_populates="dietary_preferences"

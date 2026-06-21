@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, String, Uuid
+from sqlalchemy import Boolean, Date, DateTime, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -12,7 +12,7 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
+        Uuid, primary_key=True, default=uuid.uuid4
     )
     cognito_sub: Mapped[str] = mapped_column(String(256), nullable=False, unique=True, index=True)
     display_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
@@ -20,11 +20,13 @@ class Patient(Base):
     sex_at_birth: Mapped[str | None] = mapped_column(String(64), nullable=True)
     consent_accepted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     consent_accepted_on: Mapped[date | None] = mapped_column(Date, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        nullable=False, server_default=func.now(), onupdate=func.now()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # relationships
     nutritional_profile: Mapped["NutritionalProfile"] = relationship(  # noqa: F821

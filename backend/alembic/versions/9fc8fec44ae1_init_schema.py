@@ -1,18 +1,18 @@
 """init schema
 
-Revision ID: 1ecfa417d02a
+Revision ID: 9fc8fec44ae1
 Revises: 
-Create Date: 2026-06-21 12:23:34.831828
+Create Date: 2026-06-21 12:44:53.141027
 
 """
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '1ecfa417d02a'
+revision: str = '9fc8fec44ae1'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -29,9 +29,9 @@ def upgrade() -> None:
     sa.Column('sex_at_birth', sa.String(length=64), nullable=True),
     sa.Column('consent_accepted', sa.Boolean(), nullable=False),
     sa.Column('consent_accepted_on', sa.Date(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
-    sa.Column('deleted_at', sa.DateTime(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_patients_cognito_sub'), 'patients', ['cognito_sub'], unique=True)
@@ -42,8 +42,8 @@ def upgrade() -> None:
     sa.Column('action', sa.Enum('read', 'write', 'delete', name='audit_action'), nullable=False),
     sa.Column('resource', sa.Enum('onboarding', 'labs', 'suggestions', 'recipes', 'rejections', name='audit_resource'), nullable=False),
     sa.Column('resource_id', sa.Uuid(), nullable=True),
-    sa.Column('ip_address', sa.String(length=45), nullable=True),
-    sa.Column('event_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('ip_address', sa.String(length=45).with_variant(postgresql.INET(), 'postgresql'), nullable=True),
+    sa.Column('event_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -56,7 +56,7 @@ def upgrade() -> None:
     sa.Column('value', sa.Text(), nullable=False),
     sa.Column('unit', sa.Enum('percent', 'mg_per_dl', name='lab_unit'), nullable=False),
     sa.Column('sample_date', sa.Date(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -67,8 +67,8 @@ def upgrade() -> None:
     sa.Column('diabetes_type', sa.Text(), nullable=True),
     sa.Column('diagnosis_date', sa.Text(), nullable=True),
     sa.Column('additional_notes', sa.Text(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -77,9 +77,9 @@ def upgrade() -> None:
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('patient_id', sa.Uuid(), nullable=False),
     sa.Column('title', sa.String(length=512), nullable=False),
-    sa.Column('content', sa.JSON(), nullable=False),
-    sa.Column('clinical_context_summary', sa.JSON(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('content', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
+    sa.Column('clinical_context_summary', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -89,7 +89,7 @@ def upgrade() -> None:
     sa.Column('patient_id', sa.Uuid(), nullable=False),
     sa.Column('ingredient_normalized', sa.Text(), nullable=False),
     sa.Column('ingredient_display', sa.Text(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -98,8 +98,8 @@ def upgrade() -> None:
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('patient_id', sa.Uuid(), nullable=False),
     sa.Column('source_ingredient', sa.Text(), nullable=False),
-    sa.Column('clinical_context_summary', sa.JSON(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('clinical_context_summary', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -109,7 +109,7 @@ def upgrade() -> None:
     sa.Column('nutritional_profile_id', sa.Uuid(), nullable=False),
     sa.Column('substance', sa.Text(), nullable=False),
     sa.Column('severity', sa.Text(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['nutritional_profile_id'], ['nutritional_profiles.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -118,7 +118,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('nutritional_profile_id', sa.Uuid(), nullable=False),
     sa.Column('preference', sa.String(length=256), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['nutritional_profile_id'], ['nutritional_profiles.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -127,7 +127,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('nutritional_profile_id', sa.Uuid(), nullable=False),
     sa.Column('substance', sa.Text(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['nutritional_profile_id'], ['nutritional_profiles.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -137,7 +137,7 @@ def upgrade() -> None:
     sa.Column('nutritional_profile_id', sa.Uuid(), nullable=False),
     sa.Column('name', sa.Text(), nullable=False),
     sa.Column('dosage', sa.Text(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['nutritional_profile_id'], ['nutritional_profiles.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -148,7 +148,7 @@ def upgrade() -> None:
     sa.Column('ingredient', sa.Text(), nullable=False),
     sa.Column('rationale', sa.Text(), nullable=True),
     sa.Column('rank', sa.SmallInteger(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint('rank BETWEEN 1 AND 4', name='ck_suggestion_alternatives_rank'),
     sa.ForeignKeyConstraint(['suggestion_id'], ['suggestions.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
