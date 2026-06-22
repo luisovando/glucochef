@@ -111,6 +111,13 @@ async def verify_token(token: str, _retry_count: int = 0) -> dict:
         
         if not key:
             logger.warning(f"Token key not found: {key_id}")
+            
+            # If this is the first attempt and we have cached data, invalidate cache and retry
+            if _retry_count == 0 and _jwks_cache["data"] is not None:
+                logger.warning("Token key not found, invalidating JWKS cache and retrying")
+                await _clear_jwks_cache()
+                return await verify_token(token, _retry_count=1)
+            
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token key not found",
