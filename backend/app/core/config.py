@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     cognito_region: str  # Required — set via COGNITO_REGION in .env  
     cognito_app_client_id: str  # Required — set via COGNITO_APP_CLIENT_ID in .env
 
+    # PHI field-level encryption key (Phase 5)
+    # Must be a valid Fernet key (32 url-safe base64 bytes).
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    encryption_key: str  # Required — set via ENCRYPTION_KEY in .env
+
     @model_validator(mode="after")
     def validate_cognito_config_production(self):
         """Validate Cognito configuration in production environments."""
