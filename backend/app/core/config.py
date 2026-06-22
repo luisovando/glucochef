@@ -34,23 +34,23 @@ class Settings(BaseSettings):
         # Validate user pool ID
         if not self.cognito_user_pool_id or self.cognito_user_pool_id.strip() == "":
             raise ValueError("Cognito user pool ID cannot be empty in production")
+        self.cognito_user_pool_id = self.cognito_user_pool_id.strip()
         if self.cognito_user_pool_id == "us-east-1_XXXXXXXXX" or len(self.cognito_user_pool_id) < 10:
             raise ValueError("Invalid Cognito user pool ID format")
-        self.cognito_user_pool_id = self.cognito_user_pool_id.strip()
         
         # Validate region (AWS regions are like us-east-1, eu-west-1, ap-southeast-2, etc.)
         if not self.cognito_region or self.cognito_region.strip() == "":
             raise ValueError("Cognito region cannot be empty in production")
+        self.cognito_region = self.cognito_region.strip()
         if not (len(self.cognito_region) >= 9 and len(self.cognito_region) <= 15):
             raise ValueError("Invalid AWS region format")
-        self.cognito_region = self.cognito_region.strip()
         
         # Validate app client ID
         if not self.cognito_app_client_id or self.cognito_app_client_id.strip() == "":
             raise ValueError("Cognito app client ID cannot be empty in production")
+        self.cognito_app_client_id = self.cognito_app_client_id.strip()
         if len(self.cognito_app_client_id) < 10:
             raise ValueError("Invalid Cognito app client ID format")
-        self.cognito_app_client_id = self.cognito_app_client_id.strip()
         
         return self
 

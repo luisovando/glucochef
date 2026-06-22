@@ -34,7 +34,7 @@ def valid_jwt_payload(mock_patient):
         "auth_time": int(now.timestamp()),
         "exp": int((now + timedelta(hours=1)).timestamp()),
         "iat": int(now.timestamp()),
-        "iss": f"https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX",
+        "iss": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX",
     }
 
 
@@ -107,7 +107,7 @@ class TestGetCurrentPatient:
         # Arrange
         mock_token = "invalid.signature.token"
         
-        with patch("app.core.security.verify_token", side_effect=Exception("Invalid signature")):
+        with patch("app.core.security.verify_token", side_effect=HTTPException(status_code=401, detail="Invalid token")):
             # Create mock credentials
             from fastapi.security import HTTPAuthorizationCredentials
             mock_credentials = HTTPAuthorizationCredentials(
@@ -120,7 +120,7 @@ class TestGetCurrentPatient:
                 await get_current_patient(credentials=mock_credentials, db=db_session)
             
             assert exc_info.value.status_code == 401
-            assert exc_info.value.detail in ["Invalid token", "Authentication error"]
+            assert exc_info.value.detail in ["Invalid token", "Authentication error", "Token has expired"]
 
     async def test_expired_token_returns_401(self, db_session):
         """
@@ -133,7 +133,7 @@ class TestGetCurrentPatient:
         # Arrange
         mock_token = "expired.jwt.token"
         
-        with patch("app.core.security.verify_token", side_effect=Exception("Token has expired")):
+        with patch("app.core.security.verify_token", side_effect=HTTPException(status_code=401, detail="Token has expired")):
             # Create mock credentials
             from fastapi.security import HTTPAuthorizationCredentials
             mock_credentials = HTTPAuthorizationCredentials(
@@ -146,7 +146,7 @@ class TestGetCurrentPatient:
                 await get_current_patient(credentials=mock_credentials, db=db_session)
             
             assert exc_info.value.status_code == 401
-            assert exc_info.value.detail in ["Invalid token", "Authentication error"]
+            assert exc_info.value.detail in ["Invalid token", "Authentication error", "Token has expired"]
 
     async def test_patient_not_found_returns_401(self, valid_jwt_payload, db_session):
         """
@@ -176,6 +176,42 @@ class TestGetCurrentPatient:
             assert exc_info.value.status_code == 401
             assert "Patient not found" in str(exc_info.value.detail)
 
+    async def test_missing_subject_claim_returns_401(self, db_session):
+        """
+        Test that get_current_patient returns 401 when token is missing 'sub' claim.
+        
+        Given a JWT payload without a 'sub' claim
+        When get_current_patient is called
+        It should raise HTTPException with 401 status
+        """
+        # Arrange
+        mock_token = "token.missing.sub"
+        payload_without_sub = {
+            "aud": "test-client-id",
+            "token_use": "id",
+            "auth_time": 1234567890,
+            "exp": 1234567890 + 3600,
+            "iat": 1234567890,
+            "iss": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXXXXXX",
+        }
+        
+        with patch("app.core.security.verify_token") as mock_verify:
+            mock_verify.return_value = payload_without_sub
+
+            # Create mock credentials
+            from fastapi.security import HTTPAuthorizationCredentials
+            mock_credentials = HTTPAuthorizationCredentials(
+                scheme="Bearer",
+                credentials=mock_token
+            )
+
+            # Act & Assert
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_patient(credentials=mock_credentials, db=db_session)
+            
+            assert exc_info.value.status_code == 401
+            assert "subject claim" in str(exc_info.value.detail)
+
 
 class TestMeEndpoint:
     """Test suite for GET /me endpoint."""
@@ -191,7 +227,7 @@ class TestMeEndpoint:
         It should return the patient's ID
         """
         # Create test client with dependency override
-        def override_get_current_patient():
+        async def override_get_current_patient():
             return mock_patient
 
         app.dependency_overrides[get_current_patient] = override_get_current_patient

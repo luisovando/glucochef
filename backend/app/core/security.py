@@ -18,7 +18,7 @@ from app.models.patient import Patient
 logger = logging.getLogger(__name__)
 
 # HTTP Bearer token scheme
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 # JWKS cache to avoid repeated network calls
 _jwks_cache = {"data": None, "expires_at": None}
@@ -47,7 +47,7 @@ async def get_jwks() -> dict:
         
         try:
             async with AsyncClient() as client:
-                response = await client.get(jwks_url)
+                response = await client.get(jwks_url, timeout=10.0)
                 response.raise_for_status()
                 jwks_data = response.json()
                 
@@ -192,6 +192,13 @@ async def get_current_patient(
     Raises:
         HTTPException: If token is invalid or patient not found.
     """
+    # Manual validation since auto_error=False
+    if not credentials or not credentials.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header is required",
+        )
+    
     try:
         # Verify the token and get payload
         payload = await verify_token(credentials.credentials)
