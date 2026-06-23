@@ -138,7 +138,7 @@ def _build_recipe_prompt(
 _REDACT_PATTERNS = [
     (re.compile(r"(Allergies:\s*).+?\.", re.DOTALL), r"\1[REDACTED]."),
     (re.compile(r"(Intolerances:\s*).+?\.", re.DOTALL), r"\1[REDACTED]."),
-    (re.compile(r"(diabetes type:\s*)\S+", re.DOTALL), r"\1[REDACTED]"),
+    (re.compile(r"(diabetes type:\s*).+?(?=\\n|\.\b)", re.DOTALL), r"\1[REDACTED]"),
     (re.compile(r"(Dietary preferences:\s*).+?\.", re.DOTALL), r"\1[REDACTED]."),
 ]
 
