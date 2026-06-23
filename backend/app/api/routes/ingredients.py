@@ -1,6 +1,6 @@
 """Ingredient management routes."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_patient
@@ -24,6 +24,11 @@ async def reject_ingredient(
     persistence so that duplicate submissions with different casing or
     surrounding whitespace result in a single row.
     """
+    if not name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Ingredient name must not be blank.",
+        )
     repo = RejectedIngredientRepository(db)
     await repo.reject(patient.id, name)
     await db.commit()

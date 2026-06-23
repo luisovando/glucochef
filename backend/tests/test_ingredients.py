@@ -61,6 +61,12 @@ async def test_duplicate_rejection_normalized_to_single_row(auth_client, db_sess
     assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
 
 
+async def test_whitespace_only_name_returns_422(auth_client):
+    """Whitespace-only path segment must be rejected at the API boundary with 422."""
+    response = auth_client.post("/ingredients/%20%20/reject")
+    assert response.status_code == 422, response.text
+
+
 async def test_is_rejected_returns_true_and_false(db_session, ingredient_patient):
     """
     AC2 — is_rejected returns True for a rejected ingredient and False otherwise.
