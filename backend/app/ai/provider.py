@@ -196,7 +196,7 @@ class AIProvider:
         try:
             data = json.loads(raw)
         except (json.JSONDecodeError, TypeError) as exc:
-            logger.error("AI response is not valid JSON: %s", raw)
+            logger.error("AI suggest_alternatives response is not valid JSON (%d chars)", len(raw) if raw else 0)
             raise ValueError("AI provider returned invalid JSON") from exc
 
         # Build the banned set (lowercase) for post-parse validation
@@ -238,5 +238,5 @@ class AIProvider:
         try:
             return json.loads(raw)
         except (json.JSONDecodeError, TypeError) as exc:
-            logger.error("AI response is not valid JSON: %s", raw)
+            logger.error("AI generate_recipe response is not valid JSON (%d chars)", len(raw) if raw else 0)
             raise ValueError("AI provider returned invalid JSON") from exc
