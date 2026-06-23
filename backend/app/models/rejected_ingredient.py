@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Uuid
+from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -11,6 +11,10 @@ from app.core.crypto import EncryptedString
 
 class RejectedIngredient(Base):
     __tablename__ = "rejected_ingredients"
+
+    __table_args__ = (
+        UniqueConstraint("patient_id", "ingredient_normalized", name="uq_rejected_patient_ingredient"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid, primary_key=True, default=uuid.uuid4
