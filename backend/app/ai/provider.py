@@ -98,6 +98,7 @@ def _build_recipe_prompt(
     ingredients_str = ", ".join(accepted_ingredients)
 
     lab_context = ""
+    carb_constraint = ""
     if latest_labs:
         valid_labs = {
             kind: status
@@ -107,6 +108,13 @@ def _build_recipe_prompt(
         if valid_labs:
             lab_lines = [f"- {kind}: {status}" for kind, status in valid_labs.items()]
             lab_context = "Latest lab results (traffic-light status):\n" + "\n".join(lab_lines) + "\n\n"
+            # Tighten carb constraint when HbA1c is red (poor glycaemic control).
+            if valid_labs.get("hba1c") == "red":
+                carb_constraint = (
+                    "IMPORTANT: HbA1c is red (poor glycaemic control). "
+                    "Restrict total carbohydrates to no more than 30 g per serving. "
+                    "Prefer low-carb substitutions wherever possible.\n\n"
+                )
 
     system = (
         "You are a clinical nutrition assistant for a diabetes patient. "
@@ -119,6 +127,7 @@ def _build_recipe_prompt(
         f"Intolerances: {intolerances}.\n"
         f"Dietary preferences: {preferences}.\n\n"
         f"{lab_context}"
+        f"{carb_constraint}"
         f"Create a healthy recipe using these accepted ingredients: {ingredients_str}.\n\n"
         "Return ONLY a JSON object with:\n"
         '- "title": recipe name\n'
@@ -126,6 +135,7 @@ def _build_recipe_prompt(
         '- "instructions": list of steps\n'
         '- "servings": number\n'
         '- "prep_time_minutes": number\n'
+        '- "nutrition_summary": object with estimated carbs, protein, fat per serving\n'
     )
     return [
         {"role": "system", "content": system},
