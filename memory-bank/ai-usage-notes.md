@@ -112,3 +112,16 @@ Three separate review passes surfaced and fixed the following issues.
   - `test_posting_twice_updates_profile` — second POST updates existing profile, no duplicate.
 - Verified full backend suite: 15 passed, 0 failed.
 - Proposed git artifacts: branch `feat/ai4-43-phase-6-onboarding-api`, commit `feat(AI4-43): phase 6 — onboarding API`.
+
+---
+
+## 2026-06-22 — Phase 6 / AI4-43 (review fixes)
+
+- Reviewed the Phase 6 changes for bugs, security, performance, and style.
+- **Fixed:** Added a top-level `try/except` with `await db.rollback()` in `POST /onboarding` to avoid leaking failed transactions.
+- **Fixed:** Replaced the select-then-insert upsert with a dialect-specific `INSERT ... ON CONFLICT DO UPDATE` (`postgresql` and `sqlite`) to eliminate the race condition where concurrent requests could create duplicate `NutritionalProfile` rows.
+- **Fixed:** Added Pydantic validators in `OnboardingRequest` and nested request schemas to strip whitespace and reject empty strings in PHI-bearing fields (`medications`, `allergies`, `intolerances`, `rejected_foods`, etc.).
+- **Fixed:** Removed duplicate `from datetime import date` in `app/api/routes/onboarding.py`.
+- **Corrected:** The original `lambda: db_session` override for `get_db` in test fixtures was valid; the attempted async-generator override was reverted.
+- **Style:** Made `test_unauthenticated_post_returns_401` async for consistency with the other onboarding tests.
+- Verified full backend suite: 15 passed, 0 failed.

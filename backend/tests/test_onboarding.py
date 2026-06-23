@@ -92,7 +92,7 @@ async def test_authenticated_post_creates_profile(auth_client, db_session, onboa
     assert profile.diabetes_type == "type2"
 
 
-def test_unauthenticated_post_returns_401(no_auth_client):
+async def test_unauthenticated_post_returns_401(no_auth_client):
     """
     AC2 — POST /onboarding without a valid Authorization header returns 401.
     """

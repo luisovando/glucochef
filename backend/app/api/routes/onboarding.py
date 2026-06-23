@@ -1,9 +1,9 @@
 from datetime import date
 
-from datetime import date
-
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import audit
@@ -38,18 +38,42 @@ async def create_profile(
     submission for the same patient updates the existing profile instead of
     creating a duplicate.
     """
-    # Upsert the NutritionalProfile row for the authenticated patient.
-    result = await db.execute(
-        select(NutritionalProfile).where(
-            NutritionalProfile.patient_id == patient.id
-        )
-    )
-    profile = result.scalar_one_or_none()
+    try:
+        # Upsert the NutritionalProfile row for the authenticated patient.
+        # Use a dialect-specific INSERT ... ON CONFLICT DO UPDATE so the
+        # operation is atomic and safe under concurrent requests.
+        if db.bind.dialect.name == "postgresql":
+            insert_stmt = pg_insert(NutritionalProfile)
+        elif db.bind.dialect.name == "sqlite":
+            insert_stmt = sqlite_insert(NutritionalProfile)
+        else:
+            raise NotImplementedError(
+                "Upsert not supported for this database dialect"
+            )
 
-    if profile is None:
-        profile = NutritionalProfile(patient_id=patient.id)
-        db.add(profile)
-    else:
+        upsert_stmt = insert_stmt.values(
+            patient_id=patient.id,
+            diabetes_type=payload.diabetes_type,
+            diagnosis_date=payload.diagnosis_date,
+            additional_notes=payload.additional_notes,
+        ).on_conflict_do_update(
+            index_elements=["patient_id"],
+            set_={
+                "diabetes_type": payload.diabetes_type,
+                "diagnosis_date": payload.diagnosis_date,
+                "additional_notes": payload.additional_notes,
+            },
+        )
+        await db.execute(upsert_stmt)
+        await db.flush()
+
+        result = await db.execute(
+            select(NutritionalProfile).where(
+                NutritionalProfile.patient_id == patient.id
+            )
+        )
+        profile = result.scalar_one()
+
         # Replace related rows explicitly; avoid lazy-loading collections.
         await db.execute(
             delete(Medication).where(
@@ -69,90 +93,85 @@ async def create_profile(
                 DietaryPreference.nutritional_profile_id == profile.id
             )
         )
-
-    profile.diabetes_type = payload.diabetes_type
-    profile.diagnosis_date = payload.diagnosis_date
-    profile.additional_notes = payload.additional_notes
-
-    await db.flush()
-
-    # Populate related PHI rows using explicit foreign keys.
-    for medication in payload.medications:
-        db.add(
-            Medication(
-                nutritional_profile_id=profile.id,
-                name=medication.name,
-                dosage=medication.dosage,
+        await db.execute(
+            delete(RejectedIngredient).where(
+                RejectedIngredient.patient_id == patient.id
             )
         )
 
-    for allergy in payload.allergies:
-        db.add(
-            Allergy(
-                nutritional_profile_id=profile.id,
-                substance=allergy.substance,
-                severity=allergy.severity,
+        # Populate related PHI rows using explicit foreign keys.
+        for medication in payload.medications:
+            db.add(
+                Medication(
+                    nutritional_profile_id=profile.id,
+                    name=medication.name,
+                    dosage=medication.dosage,
+                )
             )
-        )
 
-    for substance in payload.intolerances:
-        db.add(
-            Intolerance(
-                nutritional_profile_id=profile.id,
-                substance=substance,
+        for allergy in payload.allergies:
+            db.add(
+                Allergy(
+                    nutritional_profile_id=profile.id,
+                    substance=allergy.substance,
+                    severity=allergy.severity,
+                )
             )
-        )
 
-    for preference in payload.cultural_preferences:
-        db.add(
-            DietaryPreference(
-                nutritional_profile_id=profile.id,
-                preference=preference,
+        for substance in payload.intolerances:
+            db.add(
+                Intolerance(
+                    nutritional_profile_id=profile.id,
+                    substance=substance,
+                )
             )
-        )
 
-    # Replace rejected ingredients (not part of NutritionalProfile cascade).
-    await db.execute(
-        delete(RejectedIngredient).where(
-            RejectedIngredient.patient_id == patient.id
-        )
-    )
-    for ingredient in payload.rejected_foods:
-        normalized = ingredient.strip().lower()
-        db.add(
-            RejectedIngredient(
-                patient_id=patient.id,
-                ingredient_normalized=normalized,
-                ingredient_display=ingredient.strip(),
+        for preference in payload.cultural_preferences:
+            db.add(
+                DietaryPreference(
+                    nutritional_profile_id=profile.id,
+                    preference=preference,
+                )
             )
-        )
 
-    # Record explicit consent on the patient record.
-    patient.consent_accepted = True
-    patient.consent_accepted_on = date.today()
+        for ingredient in payload.rejected_foods:
+            db.add(
+                RejectedIngredient(
+                    patient_id=patient.id,
+                    ingredient_normalized=ingredient.strip().lower(),
+                    ingredient_display=ingredient.strip(),
+                )
+            )
 
-    await db.flush()
-    await db.refresh(profile)
+        # Record explicit consent on the patient record.
+        patient.consent_accepted = True
+        patient.consent_accepted_on = date.today()
 
-    # Audit the PHI write and the consent inside the same transaction.
-    async with audit(
-        session=db,
-        actor=patient,
-        action=AuditAction.write,
-        resource=AuditResource.onboarding,
-        resource_id=profile.id,
-    ):
-        pass
+        await db.flush()
+        await db.refresh(profile)
 
-    async with audit(
-        session=db,
-        actor=patient,
-        action=AuditAction.consent,
-        resource=AuditResource.onboarding,
-        resource_id=profile.id,
-    ):
-        pass
+        # Audit the PHI write and the consent inside the same transaction.
+        async with audit(
+            session=db,
+            actor=patient,
+            action=AuditAction.write,
+            resource=AuditResource.onboarding,
+            resource_id=profile.id,
+        ):
+            pass
 
-    await db.commit()
+        async with audit(
+            session=db,
+            actor=patient,
+            action=AuditAction.consent,
+            resource=AuditResource.onboarding,
+            resource_id=profile.id,
+        ):
+            pass
+
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
 
     return OnboardingResponse(profile_id=profile.id)
