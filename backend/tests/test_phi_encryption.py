@@ -51,7 +51,8 @@ async def test_lab_value_is_stored_as_ciphertext(db_session, patient_row):
 
     # Bypass the ORM and read the raw bytes stored in the column.
     raw_result = await db_session.execute(
-        text("SELECT value FROM lab_results LIMIT 1")
+        text("SELECT value FROM lab_results WHERE id = :id"),
+        {"id": str(lab.id)},
     )
     raw_value = raw_result.scalar()
 
