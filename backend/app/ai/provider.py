@@ -190,6 +190,7 @@ class AIProvider:
             model=self._model,
             messages=messages,
             temperature=0.7,
+            response_format={"type": "json_object"},
         )
 
         raw = response.choices[0].message.content
@@ -232,6 +233,7 @@ class AIProvider:
             model=self._model,
             messages=messages,
             temperature=0.7,
+            response_format={"type": "json_object"},
         )
 
         raw = response.choices[0].message.content
