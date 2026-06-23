@@ -62,3 +62,14 @@ Format:
 **Decision:** `dietary_preferences.preference VARCHAR(80)` is stored as plaintext, with a DB-level `UNIQUE (nutritional_profile_id, preference)` constraint. It is not wrapped in `EncryptedString`.
 **Rationale:** A preference tag on its own does not indicate a diagnosis; encrypting it would block useful uniqueness and lookup behaviour at the database layer without a meaningful privacy gain.
 **Consequences:** If a future requirement allows free-text preference notes that could leak clinical information (e.g., "avoids gluten because celiac"), this column must move to `EncryptedString` and a new entry must supersede this one.
+
+---
+
+## 2026-06-22 — Fernet (AES-128-CBC + HMAC) used for PHI field-level encryption
+
+**Scope:** `app/core/crypto.py`, all PHI columns, Phase 5.
+**Status:** accepted.
+**Context:** PRD Phase 5 requires AES-256 field-level encryption on PHI columns. The `cryptography` library's `Fernet` primitive (AES-128-CBC + HMAC-SHA256) was evaluated against raw AES-256-GCM as the implementation vehicle.
+**Decision:** Use `Fernet` from the `cryptography` library as the SQLAlchemy `TypeDecorator` backing `EncryptedString`. The key is a 32-byte url-safe base64 string stored in the `ENCRYPTION_KEY` environment variable. Key rotation is deferred to v2.
+**Rationale:** Fernet provides authenticated encryption (confidentiality + integrity via HMAC), a simple key format, and a well-tested Python implementation. The PRD notes that Fernet is "acceptable as AES-256-equivalent per HIPAA practice baseline". Raw AES-256-GCM would require manual IV handling and lacks the high-level API safety that Fernet provides within the 30h budget constraint. The output is url-safe ASCII, so no binary column type is required.
+**Consequences:** All PHI columns store Fernet-encrypted ciphertext as TEXT in PostgreSQL. The `ENCRYPTION_KEY` env var must be set before any PHI write. Decryption failure (key mismatch or data corruption) raises `ValueError` — callers must not catch this silently. Key versioning and rotation require a v2 design entry before any production key change.

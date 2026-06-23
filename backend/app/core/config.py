@@ -1,5 +1,5 @@
 from pathlib import Path
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
  
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -23,6 +23,26 @@ class Settings(BaseSettings):
     cognito_user_pool_id: str  # Required — set via COGNITO_USER_POOL_ID in .env
     cognito_region: str  # Required — set via COGNITO_REGION in .env  
     cognito_app_client_id: str  # Required — set via COGNITO_APP_CLIENT_ID in .env
+
+    # PHI field-level encryption key (Phase 5)
+    # Must be a valid Fernet key (32 url-safe base64 bytes).
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    encryption_key: str  # Required — set via ENCRYPTION_KEY in .env
+
+    @field_validator("encryption_key")
+    @classmethod
+    def validate_encryption_key(cls, v: str) -> str:
+        """Fail at startup — not mid-request — if the key is not a valid Fernet key."""
+        from cryptography.fernet import Fernet, InvalidToken  # noqa: F401 (lazy import)
+        try:
+            Fernet(v.encode())
+        except Exception as exc:
+            raise ValueError(
+                "ENCRYPTION_KEY is not a valid Fernet key. "
+                "Generate one with: python -c \"from cryptography.fernet import Fernet; "
+                "print(Fernet.generate_key().decode())\""
+            ) from exc
+        return v
 
     @model_validator(mode="after")
     def validate_cognito_config_production(self):
