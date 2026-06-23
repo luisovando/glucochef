@@ -89,3 +89,26 @@ Three separate review passes surfaced and fixed the following issues.
 - `frontend/.env.example` documents all frontend vars (`NEXT_PUBLIC_*`), including `NEXT_PUBLIC_` prefix explanation and browser-visibility warning.
 - `docker-compose.yml` Postgres vars upgraded to `${VAR:?message}` — fails fast with actionable error if `.env` is missing.
 - `ENCRYPTION_KEY=change_me` replaced with `ENCRYPTION_KEY=REPLACE_WITH_GENERATED_FERNET_KEY` — `change_me` is not a valid 32-byte Fernet key.
+
+---
+
+## 2026-06-22 — Phase 6 / AI4-43 (onboarding API)
+
+- Executed `@glucochef-phase-executor Phase 6 / AI4-43`.
+- Dependency check: Phase 5 encryption + audit tests pass (12/12) after populating `backend/.env` `ENCRYPTION_KEY` with a valid Fernet key.
+- Added `consent` value to `AuditAction` enum and created Alembic migration `e3d89e75cb1c` to add the value to PostgreSQL `audit_action` enum.
+- Created `backend/app/schemas/onboarding.py` with `OnboardingRequest` (consent validator) and `OnboardingResponse`.
+- Created `backend/app/api/routes/onboarding.py` with `POST /onboarding`:
+  - Protected by `get_current_patient`.
+  - Upserts `NutritionalProfile` per patient.
+  - Replaces related PHI rows (`medications`, `allergies`, `intolerances`) and non-PHI rows (`dietary_preferences`).
+  - Replaces `rejected_ingredients` rows.
+  - Records explicit consent on the `Patient` record.
+  - Writes two audit entries (`write onboarding`, `consent`) in the same transaction.
+- Registered `onboarding_router` in `backend/app/main.py`.
+- Added `backend/tests/test_onboarding.py` with three AC tests:
+  - `test_authenticated_post_creates_profile` — 201 + profile id.
+  - `test_unauthenticated_post_returns_401` — no auth header returns 401.
+  - `test_posting_twice_updates_profile` — second POST updates existing profile, no duplicate.
+- Verified full backend suite: 15 passed, 0 failed.
+- Proposed git artifacts: branch `feat/ai4-43-phase-6-onboarding-api`, commit `feat(AI4-43): phase 6 — onboarding API`.

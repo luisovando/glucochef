@@ -17,6 +17,7 @@ class AuditAction(str, enum.Enum):
     read = "read"
     write = "write"
     delete = "delete"
+    consent = "consent"
 
 
 class AuditResource(str, enum.Enum):
