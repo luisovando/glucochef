@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     encryption_key: str  # Required — set via ENCRYPTION_KEY in .env
 
+    # AI provider configuration (Phase 8)
+    ai_provider: str = "openai"  # Only "openai" supported in MVP
+    ai_api_key: str = ""  # Set via AI_API_KEY in .env (or OPENAI_API_KEY)
+    ai_model: str = "gpt-4o-mini"  # Default model; override via AI_MODEL in .env
+
     @field_validator("encryption_key")
     @classmethod
     def validate_encryption_key(cls, v: str) -> str:

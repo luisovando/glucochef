@@ -143,3 +143,52 @@ Three separate review passes surfaced and fixed the following issues.
 - Fix: removed consent fields from the fixture so the patient starts in an unconsented state.
 - Updated `test_authenticated_post_creates_profile` to assert that the endpoint sets `consent_accepted=True` and `consent_accepted_on=date.today()` on first submission.
 - Verified full backend suite: 16 passed, 0 failed.
+
+---
+
+## 2026-06-22 — Phase 8 / AI4-45 (AI provider abstraction)
+
+- Executed `@glucochef-phase-executor Phase 8 / AI4-45`.
+- **Provider decision:** OpenAI selected as the concrete implementation. Rationale: best structured-output support (JSON mode), lightweight SDK, widest ecosystem. Documented in `config.py` as `ai_provider = "openai"` with model default `gpt-4o-mini`.
+- Added `openai>=1.30.0` to `pyproject.toml` runtime deps.
+- Added `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` settings to `app/core/config.py`.
+- Created `app/ai/__init__.py` and `app/ai/provider.py` with:
+  - `AIProvider` class (OpenAI `AsyncOpenAI` client).
+  - `suggest_alternatives(ingredient, profile, excluded) -> list[Alternative]` — builds prompt with patient allergies, intolerances, preferences, and excluded ingredients.
+  - `generate_recipe(accepted_ingredients, profile, latest_labs) -> dict` — builds prompt with accepted ingredients, patient profile, and traffic-light lab context.
+  - `_build_suggest_prompt()` and `_build_recipe_prompt()` pure functions.
+  - `_redact_for_log()` helper for prompt logging.
+- Created `tests/test_ai_provider.py` with mocked `AsyncOpenAI` client, asserting prompt structure.
+- TDD cycle: RED (ModuleNotFoundError) → GREEN (2 passed) → full suite 21 passed, 0 failed.
+
+### Redacted prompt sample — `suggest_alternatives`
+
+```json
+[
+  {
+    "role": "system",
+    "content": "You are a clinical nutrition assistant for a diabetes patient. Always respect the patient's allergies, intolerances, and dietary preferences. Never suggest any excluded ingredient. Return a JSON array of 3-4 alternative ingredients."
+  },
+  {
+    "role": "user",
+    "content": "The patient has diabetes type: type_2.\nAllergies: peanuts, shellfish.\nIntolerances: lactose.\nDietary preferences: Mediterranean.\nExcluded (rejected) ingredients: salmon, shrimp.\n\nSuggest 3-4 alternative ingredients to replace \"salmon\". For each alternative, provide:\n- \"ingredient\": name\n- \"rationale\": why it is a good substitute\n- \"rank\": priority (1 = best)\n\nReturn ONLY a JSON array, no other text."
+  }
+]
+```
+
+### Redacted prompt sample — `generate_recipe`
+
+```json
+[
+  {
+    "role": "system",
+    "content": "You are a clinical nutrition assistant for a diabetes patient. Generate a recipe that respects the patient's allergies, intolerances, and dietary preferences. Adjust the recipe based on the patient's lab status."
+  },
+  {
+    "role": "user",
+    "content": "The patient has diabetes type: type_2.\nAllergies: peanuts.\nIntolerances: gluten.\nDietary preferences: none.\n\nLatest lab results (traffic-light status):\n- hba1c: green\n- fasting_glucose: amber\n\nCreate a healthy recipe using these accepted ingredients: chicken breast, rice, broccoli.\n\nReturn ONLY a JSON object with:\n- \"title\": recipe name\n- \"ingredients\": list of ingredients with quantities\n- \"instructions\": list of steps\n- \"servings\": number\n- \"prep_time_minutes\": number\n"
+  }
+]
+```
+
+**PHI note:** Prompts contain no patient identifiers, no raw lab numeric values — only traffic-light strings (green/amber/red) and food preference data. This is by design per ADR-004.
