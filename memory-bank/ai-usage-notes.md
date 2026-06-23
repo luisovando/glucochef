@@ -125,3 +125,12 @@ Three separate review passes surfaced and fixed the following issues.
 - **Corrected:** The original `lambda: db_session` override for `get_db` in test fixtures was valid; the attempted async-generator override was reverted.
 - **Style:** Made `test_unauthenticated_post_returns_401` async for consistency with the other onboarding tests.
 - Verified full backend suite: 15 passed, 0 failed.
+
+---
+
+## 2026-06-22 — Phase 6 / AI4-43 (consent timestamp fix)
+
+- Verified finding: `patient.consent_accepted_on` in `POST /onboarding` was unconditionally set to `date.today()` on every submission, overwriting the original consent date.
+- Fix: only update `consent_accepted` and `consent_accepted_on` when `patient.consent_accepted` was previously `False`.
+- Added regression test `test_consent_timestamp_preserved_on_update`.
+- Verified full backend suite: 16 passed, 0 failed.

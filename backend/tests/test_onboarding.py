@@ -125,3 +125,22 @@ async def test_posting_twice_updates_profile(auth_client, db_session, onboarding
     profiles = result.scalars().all()
     assert len(profiles) == 1
     assert profiles[0].diabetes_type == "type1"
+
+
+async def test_consent_timestamp_preserved_on_update(auth_client, db_session, onboarding_patient):
+    """
+    Once a patient has consented, subsequent onboarding updates must not
+    overwrite the original consent acceptance date.
+    """
+    original_date = date(2023, 5, 15)
+    onboarding_patient.consent_accepted = True
+    onboarding_patient.consent_accepted_on = original_date
+    await db_session.flush()
+
+    payload = _valid_payload()
+    response = auth_client.post("/onboarding", json=payload)
+    assert response.status_code == 201
+
+    await db_session.refresh(onboarding_patient)
+    assert onboarding_patient.consent_accepted is True
+    assert onboarding_patient.consent_accepted_on == original_date

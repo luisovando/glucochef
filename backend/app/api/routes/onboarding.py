@@ -143,9 +143,11 @@ async def create_profile(
                 )
             )
 
-        # Record explicit consent on the patient record.
-        patient.consent_accepted = True
-        patient.consent_accepted_on = date.today()
+        # Record explicit consent on the patient record only the first time,
+        # preserving the original consent acceptance timestamp.
+        if not patient.consent_accepted:
+            patient.consent_accepted = True
+            patient.consent_accepted_on = date.today()
 
         await db.flush()
         await db.refresh(profile)
