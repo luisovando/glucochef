@@ -6,6 +6,7 @@ TDD RED: these tests FAIL until app/core/audit.py is implemented.
 
 import uuid
 from datetime import date
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -83,3 +84,23 @@ async def test_audit_context_manager_still_writes_row_on_exception(db_session, p
     )
     entries = result.scalars().all()
     assert len(entries) == 1, "Audit entry must be written even when an exception occurs"
+
+
+async def test_original_exception_not_masked_when_flush_fails(db_session, patient_row):
+    """
+    When the body raises AND session.flush() also raises, the original body
+    exception must propagate — the flush error must not replace it.
+    """
+    from app.core.audit import audit
+
+    with patch.object(
+        db_session, "flush", new_callable=AsyncMock, side_effect=RuntimeError("flush failed")
+    ):
+        with pytest.raises(ValueError, match="original error"):
+            async with audit(
+                session=db_session,
+                actor=patient_row,
+                action=AuditAction.write,
+                resource=AuditResource.labs,
+            ):
+                raise ValueError("original error")

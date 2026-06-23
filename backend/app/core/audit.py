@@ -25,11 +25,14 @@ HIPAA note: the `resource` field stores only a resource-type identifier and
 an optional UUID. Raw PHI values are never written to this table.
 """
 
+import logging
 import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.models.audit_log_entry import AuditLogEntry
 from app.models.enums import AuditAction, AuditResource
@@ -79,7 +82,18 @@ async def audit(
             ip_address=ip_address,
         )
         session.add(entry)
-        await session.flush()  # write within the current transaction
+        try:
+            await session.flush()  # write within the current transaction
+        except Exception as flush_exc:
+            # If a body exception is already pending, log the flush failure
+            # and let the original error propagate unchanged.
+            if exc_to_reraise is not None:
+                logger.error(
+                    "audit flush failed (original error takes precedence): %s",
+                    flush_exc,
+                )
+            else:
+                raise
 
     if exc_to_reraise is not None:
         raise exc_to_reraise
