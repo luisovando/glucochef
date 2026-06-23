@@ -1,7 +1,7 @@
 """
 Phase 7 — Rejected ingredient persistence.
 
-AC1: Rejecting "salmón" then rejecting "Salmón " (whitespace/case) results in a single row.
+AC1: Rejecting "salmon" then rejecting "Salmon " (whitespace/case) results in a single row.
 AC2: is_rejected returns True for the rejected ingredient and False otherwise.
 """
 
@@ -43,7 +43,7 @@ def auth_client(db_session, ingredient_patient):
 
 async def test_duplicate_rejection_normalized_to_single_row(auth_client, db_session, ingredient_patient):
     """
-    AC1 — Rejecting "salmón" then "Salmón " (whitespace/case variant) must result
+    AC1 — Rejecting "salmon" then "Salmon " (whitespace/case variant) must result
     in exactly one row in rejected_ingredients for this patient.
     """
     r1 = auth_client.post("/ingredients/salmón/reject")
