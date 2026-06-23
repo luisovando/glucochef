@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
@@ -17,6 +18,8 @@ from openai import AsyncOpenAI
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+_VALID_TRAFFIC_LIGHT_STATUSES = frozenset({"green", "amber", "red"})
 
 
 # ── Domain value objects returned by the provider ────────────────────────────
@@ -96,8 +99,14 @@ def _build_recipe_prompt(
 
     lab_context = ""
     if latest_labs:
-        lab_lines = [f"- {kind}: {status}" for kind, status in latest_labs.items()]
-        lab_context = "Latest lab results (traffic-light status):\n" + "\n".join(lab_lines) + "\n\n"
+        valid_labs = {
+            kind: status
+            for kind, status in latest_labs.items()
+            if status in _VALID_TRAFFIC_LIGHT_STATUSES
+        }
+        if valid_labs:
+            lab_lines = [f"- {kind}: {status}" for kind, status in valid_labs.items()]
+            lab_context = "Latest lab results (traffic-light status):\n" + "\n".join(lab_lines) + "\n\n"
 
     system = (
         "You are a clinical nutrition assistant for a diabetes patient. "
@@ -126,15 +135,24 @@ def _build_recipe_prompt(
 
 # ── Redaction helper ─────────────────────────────────────────────────────────
 
+_REDACT_PATTERNS = [
+    (re.compile(r"(Allergies:\s*).+?\.", re.DOTALL), r"\1[REDACTED]."),
+    (re.compile(r"(Intolerances:\s*).+?\.", re.DOTALL), r"\1[REDACTED]."),
+    (re.compile(r"(diabetes type:\s*)\S+", re.DOTALL), r"\1[REDACTED]"),
+    (re.compile(r"(Dietary preferences:\s*).+?\.", re.DOTALL), r"\1[REDACTED]."),
+]
+
 
 def _redact_for_log(messages: list[dict[str, str]]) -> str:
     """Return a redacted version of the prompt for the AI usage log.
 
-    PHI is already excluded from prompts by design (we use traffic-light
-    strings for labs, not raw values), but this helper replaces anything
-    that looks like a patient identifier just in case.
+    Masks clinical profile fields (allergies, intolerances, diabetes type,
+    dietary preferences) so sensitive patient context is not persisted in logs.
+    Lab values are already traffic-light strings by design.
     """
     text = json.dumps(messages, indent=2)
+    for pattern, replacement in _REDACT_PATTERNS:
+        text = pattern.sub(replacement, text)
     return text
 
 
@@ -152,7 +170,11 @@ class AIProvider:
     def __init__(self, *, api_key: str | None = None, model: str | None = None):
         self._api_key = api_key or settings.ai_api_key
         self._model = model or settings.ai_model
-        self._client = AsyncOpenAI(api_key=self._api_key or "sk-placeholder")
+        if not self._api_key:
+            raise ValueError(
+                "AI API key is required. Set AI_API_KEY or OPENAI_API_KEY in .env"
+            )
+        self._client = AsyncOpenAI(api_key=self._api_key)
 
     async def suggest_alternatives(
         self,
@@ -171,16 +193,30 @@ class AIProvider:
         )
 
         raw = response.choices[0].message.content
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.error("AI response is not valid JSON: %s", raw)
+            raise ValueError("AI provider returned invalid JSON") from exc
 
-        return [
+        # Build the banned set (lowercase) for post-parse validation
+        banned = {item.lower() for item in excluded}
+        if profile.allergies:
+            banned.update(a.lower() for a in profile.allergies)
+        if profile.intolerances:
+            banned.update(i.lower() for i in profile.intolerances)
+
+        alternatives = [
             Alternative(
                 ingredient=item["ingredient"],
                 rationale=item["rationale"],
                 rank=item["rank"],
             )
             for item in data
+            if item.get("ingredient", "").lower() not in banned
         ]
+
+        return alternatives
 
     async def generate_recipe(
         self,
@@ -199,4 +235,8 @@ class AIProvider:
         )
 
         raw = response.choices[0].message.content
-        return json.loads(raw)
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.error("AI response is not valid JSON: %s", raw)
+            raise ValueError("AI provider returned invalid JSON") from exc

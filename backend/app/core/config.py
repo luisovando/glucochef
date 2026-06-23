@@ -1,5 +1,5 @@
 from pathlib import Path
-from pydantic import field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
  
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -31,8 +31,21 @@ class Settings(BaseSettings):
 
     # AI provider configuration (Phase 8)
     ai_provider: str = "openai"  # Only "openai" supported in MVP
-    ai_api_key: str = ""  # Set via AI_API_KEY in .env (or OPENAI_API_KEY)
+    ai_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("AI_API_KEY", "OPENAI_API_KEY"),
+    )
     ai_model: str = "gpt-4o-mini"  # Default model; override via AI_MODEL in .env
+
+    @field_validator("ai_provider")
+    @classmethod
+    def validate_ai_provider(cls, v: str) -> str:
+        """Only 'openai' is supported in MVP."""
+        if v != "openai":
+            raise ValueError(
+                f"Unsupported AI provider '{v}'. Only 'openai' is supported in MVP."
+            )
+        return v
 
     @field_validator("encryption_key")
     @classmethod

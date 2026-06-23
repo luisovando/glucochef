@@ -51,7 +51,7 @@ class TestSuggestAlternatives:
             {"ingredient": "lentils", "rationale": "Plant-based protein", "rank": 3},
         ]))
 
-        provider = AIProvider()
+        provider = AIProvider(api_key="sk-test-key")
 
         with patch.object(
             provider._client.chat.completions, "create", new_callable=AsyncMock,
@@ -84,11 +84,43 @@ class TestSuggestAlternatives:
             assert isinstance(result, list)
             assert len(result) >= 1
 
+    async def test_filters_out_banned_ingredients_from_response(self):
+        """Alternatives matching excluded/allergens/intolerances are filtered."""
+        from app.ai.provider import AIProvider
+
+        profile = FakeProfile(
+            allergies=["peanuts"],
+            intolerances=["lactose"],
+        )
+        excluded = ["salmon"]
+
+        mock_response = _mock_openai_response(json.dumps([
+            {"ingredient": "tofu", "rationale": "Safe", "rank": 1},
+            {"ingredient": "Salmon", "rationale": "Oops", "rank": 2},
+            {"ingredient": "Peanuts", "rationale": "Oops", "rank": 3},
+        ]))
+
+        provider = AIProvider(api_key="sk-test-key")
+
+        with patch.object(
+            provider._client.chat.completions, "create", new_callable=AsyncMock,
+            return_value=mock_response,
+        ):
+            result = await provider.suggest_alternatives(
+                ingredient="salmon",
+                profile=profile,
+                excluded=excluded,
+            )
+
+            assert len(result) == 1
+            assert result[0].ingredient == "tofu"
+
 
 class TestGenerateRecipe:
-    """AC1 — generate_recipe prompt includes allergies and excludes rejected."""
+    """AC1 — generate_recipe prompt includes allergies, intolerances, ingredients, and lab context."""
 
-    async def test_prompt_includes_allergies_and_excludes_rejected(self):
+    async def test_prompt_includes_allergies_intolerances_ingredients_and_labs(self):
+        """Prompt includes allergies, intolerances, accepted ingredients, and lab context."""
         from app.ai.provider import AIProvider
 
         profile = FakeProfile(
@@ -106,7 +138,7 @@ class TestGenerateRecipe:
             "prep_time_minutes": 30,
         }))
 
-        provider = AIProvider()
+        provider = AIProvider(api_key="sk-test-key")
 
         with patch.object(
             provider._client.chat.completions, "create", new_callable=AsyncMock,
@@ -142,3 +174,40 @@ class TestGenerateRecipe:
             # Result should be a dict with recipe data
             assert isinstance(result, dict)
             assert "title" in result
+
+    async def test_invalid_lab_values_excluded_from_prompt(self):
+        """Raw numeric lab values are filtered out; only traffic-light strings pass."""
+        from app.ai.provider import AIProvider
+
+        profile = FakeProfile(allergies=["peanuts"])
+        accepted_ingredients = ["rice"]
+        latest_labs = {"hba1c": "green", "fasting_glucose": "8.4%"}
+
+        mock_response = _mock_openai_response(json.dumps({
+            "title": "Rice Bowl",
+            "ingredients": ["rice"],
+            "instructions": ["Cook rice"],
+            "servings": 1,
+            "prep_time_minutes": 15,
+        }))
+
+        provider = AIProvider(api_key="sk-test-key")
+
+        with patch.object(
+            provider._client.chat.completions, "create", new_callable=AsyncMock,
+            return_value=mock_response,
+        ) as mock_create:
+            await provider.generate_recipe(
+                accepted_ingredients=accepted_ingredients,
+                profile=profile,
+                latest_labs=latest_labs,
+            )
+
+            call_kwargs = mock_create.call_args
+            messages = call_kwargs.kwargs.get("messages") or call_kwargs[1].get("messages") or call_kwargs[0][0]
+            prompt_text = " ".join(
+                m["content"] for m in messages if isinstance(m.get("content"), str)
+            )
+
+            assert "8.4%" not in prompt_text, "Raw lab value must not appear in prompt"
+            assert "hba1c" in prompt_text.lower(), "Valid traffic-light lab should be present"
