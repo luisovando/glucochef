@@ -22,7 +22,7 @@ class RejectedIngredientRepository:
         Persist a rejection, ignoring duplicates.
 
         Normalisation: strip whitespace + lower-case before persisting so that
-        "salmón" and "Salmón " resolve to the same row.
+        "salmon" and "Salmon " resolve to the same row.
 
         Because EncryptedString uses non-deterministic Fernet encryption, a
         DB-level unique constraint cannot deduplicate ciphertexts. We therefore
