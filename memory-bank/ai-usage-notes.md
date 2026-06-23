@@ -89,3 +89,57 @@ Three separate review passes surfaced and fixed the following issues.
 - `frontend/.env.example` documents all frontend vars (`NEXT_PUBLIC_*`), including `NEXT_PUBLIC_` prefix explanation and browser-visibility warning.
 - `docker-compose.yml` Postgres vars upgraded to `${VAR:?message}` — fails fast with actionable error if `.env` is missing.
 - `ENCRYPTION_KEY=change_me` replaced with `ENCRYPTION_KEY=REPLACE_WITH_GENERATED_FERNET_KEY` — `change_me` is not a valid 32-byte Fernet key.
+
+---
+
+## 2026-06-22 — Phase 6 / AI4-43 (onboarding API)
+
+- Executed `@glucochef-phase-executor Phase 6 / AI4-43`.
+- Dependency check: Phase 5 encryption + audit tests pass (12/12) after populating `backend/.env` `ENCRYPTION_KEY` with a valid Fernet key.
+- Added `consent` value to `AuditAction` enum and created Alembic migration `e3d89e75cb1c` to add the value to PostgreSQL `audit_action` enum.
+- Created `backend/app/schemas/onboarding.py` with `OnboardingRequest` (consent validator) and `OnboardingResponse`.
+- Created `backend/app/api/routes/onboarding.py` with `POST /onboarding`:
+  - Protected by `get_current_patient`.
+  - Upserts `NutritionalProfile` per patient.
+  - Replaces related PHI rows (`medications`, `allergies`, `intolerances`) and non-PHI rows (`dietary_preferences`).
+  - Replaces `rejected_ingredients` rows.
+  - Records explicit consent on the `Patient` record.
+  - Writes two audit entries (`write onboarding`, `consent`) in the same transaction.
+- Registered `onboarding_router` in `backend/app/main.py`.
+- Added `backend/tests/test_onboarding.py` with three AC tests:
+  - `test_authenticated_post_creates_profile` — 201 + profile id.
+  - `test_unauthenticated_post_returns_401` — no auth header returns 401.
+  - `test_posting_twice_updates_profile` — second POST updates existing profile, no duplicate.
+- Verified full backend suite: 15 passed, 0 failed.
+- Proposed git artifacts: branch `feat/ai4-43-phase-6-onboarding-api`, commit `feat(AI4-43): phase 6 — onboarding API`.
+
+---
+
+## 2026-06-22 — Phase 6 / AI4-43 (review fixes)
+
+- Reviewed the Phase 6 changes for bugs, security, performance, and style.
+- **Fixed:** Added a top-level `try/except` with `await db.rollback()` in `POST /onboarding` to avoid leaking failed transactions.
+- **Fixed:** Replaced the select-then-insert upsert with a dialect-specific `INSERT ... ON CONFLICT DO UPDATE` (`postgresql` and `sqlite`) to eliminate the race condition where concurrent requests could create duplicate `NutritionalProfile` rows.
+- **Fixed:** Added Pydantic validators in `OnboardingRequest` and nested request schemas to strip whitespace and reject empty strings in PHI-bearing fields (`medications`, `allergies`, `intolerances`, `rejected_foods`, etc.).
+- **Fixed:** Removed duplicate `from datetime import date` in `app/api/routes/onboarding.py`.
+- **Corrected:** The original `lambda: db_session` override for `get_db` in test fixtures was valid; the attempted async-generator override was reverted.
+- **Style:** Made `test_unauthenticated_post_returns_401` async for consistency with the other onboarding tests.
+- Verified full backend suite: 15 passed, 0 failed.
+
+---
+
+## 2026-06-22 — Phase 6 / AI4-43 (consent timestamp fix)
+
+- Verified finding: `patient.consent_accepted_on` in `POST /onboarding` was unconditionally set to `date.today()` on every submission, overwriting the original consent date.
+- Fix: only update `consent_accepted` and `consent_accepted_on` when `patient.consent_accepted` was previously `False`.
+- Added regression test `test_consent_timestamp_preserved_on_update`.
+- Verified full backend suite: 16 passed, 0 failed.
+
+---
+
+## 2026-06-22 — Phase 6 / AI4-43 (fixture consent-state fix)
+
+- Verified finding: `onboarding_patient` test fixture pre-set `consent_accepted=True` and `consent_accepted_on=date.today()`, meaning the endpoint was not the sole source of the patient's consent state.
+- Fix: removed consent fields from the fixture so the patient starts in an unconsented state.
+- Updated `test_authenticated_post_creates_profile` to assert that the endpoint sets `consent_accepted=True` and `consent_accepted_on=date.today()` on first submission.
+- Verified full backend suite: 16 passed, 0 failed.
