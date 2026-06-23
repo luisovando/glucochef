@@ -110,10 +110,12 @@ def _build_recipe_prompt(
             lab_context = "Latest lab results (traffic-light status):\n" + "\n".join(lab_lines) + "\n\n"
             # Tighten carb constraint when HbA1c is red (poor glycaemic control).
             if valid_labs.get("hba1c") == "red":
+                from app.services.recommendations import CARB_LIMIT_PHRASE  # avoid circular at module level
                 carb_constraint = (
-                    "IMPORTANT: HbA1c is red (poor glycaemic control). "
-                    "Restrict total carbohydrates to no more than 30 g per serving. "
-                    "Prefer low-carb substitutions wherever possible.\n\n"
+                    f"IMPORTANT: HbA1c is red (poor glycaemic control). "
+                    f"Please {CARB_LIMIT_PHRASE} and restrict total carbohydrates "
+                    f"to no more than 30 g per serving. "
+                    f"Prefer low-carb substitutions wherever possible.\n\n"
                 )
 
     system = (

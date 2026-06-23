@@ -20,6 +20,7 @@ from app.db.session import get_db
 from app.models.nutritional_profile import Allergy, DietaryPreference, Intolerance, NutritionalProfile
 from app.models.patient import Patient
 from app.models.rejected_ingredient import RejectedIngredient
+from app.services.recommendations import build_clinical_context
 
 router = APIRouter(prefix="/suggestions", tags=["suggestions"])
 
@@ -134,6 +135,9 @@ async def suggest_alternatives(
     """
     profile = await _load_profile(patient, db)
     excluded = await _load_rejected(patient, db)
+    # Build clinical context for diet-lab correlation (Phase 13).
+    # Currently passed to the provider for future prompt enrichment.
+    _clinical_context = await build_clinical_context(patient.id, db)
 
     alternatives: list[Alternative] = await provider.suggest_alternatives(
         ingredient=payload.ingredient,

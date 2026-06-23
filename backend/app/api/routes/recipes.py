@@ -19,6 +19,7 @@ from app.core.security import get_current_patient
 from app.db.session import get_db
 from app.models.patient import Patient
 from app.models.recipe import Recipe
+from app.services.recommendations import build_clinical_context
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
 
@@ -65,8 +66,10 @@ async def generate_recipe(
     """
     profile = await _load_profile(patient, db)
 
-    # Soft dependency on Phase 11 — pass None until labs are available.
-    latest_labs: dict[str, str] | None = None
+    # Build clinical context from latest lab results (Phase 13 wiring).
+    # Returns empty dict when no labs exist yet (soft dependency on Phase 11).
+    clinical_context = await build_clinical_context(patient.id, db)
+    latest_labs: dict[str, str] | None = clinical_context or None
 
     raw: dict = await provider.generate_recipe(
         accepted_ingredients=payload.accepted_ingredients,
