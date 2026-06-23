@@ -134,3 +134,12 @@ Three separate review passes surfaced and fixed the following issues.
 - Fix: only update `consent_accepted` and `consent_accepted_on` when `patient.consent_accepted` was previously `False`.
 - Added regression test `test_consent_timestamp_preserved_on_update`.
 - Verified full backend suite: 16 passed, 0 failed.
+
+---
+
+## 2026-06-22 — Phase 6 / AI4-43 (fixture consent-state fix)
+
+- Verified finding: `onboarding_patient` test fixture pre-set `consent_accepted=True` and `consent_accepted_on=date.today()`, meaning the endpoint was not the sole source of the patient's consent state.
+- Fix: removed consent fields from the fixture so the patient starts in an unconsented state.
+- Updated `test_authenticated_post_creates_profile` to assert that the endpoint sets `consent_accepted=True` and `consent_accepted_on=date.today()` on first submission.
+- Verified full backend suite: 16 passed, 0 failed.

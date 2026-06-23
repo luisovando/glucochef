@@ -25,8 +25,6 @@ async def onboarding_patient(db_session):
     """Insert a Patient row to be used as the authenticated user."""
     p = Patient(
         cognito_sub=f"test-sub-onboarding-{uuid.uuid4()}",
-        consent_accepted=True,
-        consent_accepted_on=date.today(),
     )
     db_session.add(p)
     await db_session.commit()
@@ -73,8 +71,11 @@ def _valid_payload():
 async def test_authenticated_post_creates_profile(auth_client, db_session, onboarding_patient):
     """
     AC1 — Authenticated POST /onboarding creates a NutritionalProfile and
-    returns HTTP 201 with the profile id.
+    returns HTTP 201 with the profile id, and records the patient's consent.
     """
+    assert onboarding_patient.consent_accepted is False
+    assert onboarding_patient.consent_accepted_on is None
+
     payload = _valid_payload()
     response = auth_client.post("/onboarding", json=payload)
 
@@ -90,6 +91,10 @@ async def test_authenticated_post_creates_profile(auth_client, db_session, onboa
     assert profile is not None
     assert profile.id == profile_id
     assert profile.diabetes_type == "type2"
+
+    await db_session.refresh(onboarding_patient)
+    assert onboarding_patient.consent_accepted is True
+    assert onboarding_patient.consent_accepted_on == date.today()
 
 
 async def test_unauthenticated_post_returns_401(no_auth_client):
