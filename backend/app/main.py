@@ -1,7 +1,10 @@
 from fastapi import FastAPI, Depends
 
 from app.api.routes.ingredients import router as ingredients_router
+from app.api.routes.labs import router as labs_router
 from app.api.routes.onboarding import router as onboarding_router
+from app.api.routes.recipes import router as recipes_router
+from app.api.routes.suggestions import router as suggestions_router
 from app.core.config import settings
 from app.core.security import get_current_patient
 from app.models.patient import Patient
@@ -10,6 +13,9 @@ app = FastAPI(title=settings.app_name, debug=settings.debug)
 
 app.include_router(onboarding_router)
 app.include_router(ingredients_router)
+app.include_router(suggestions_router)
+app.include_router(recipes_router)
+app.include_router(labs_router)
 
 
 @app.get("/health")
