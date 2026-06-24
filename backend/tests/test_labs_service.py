@@ -168,6 +168,39 @@ class TestTrend:
         trend = await compute_trend(patient.id, LabKind.hba1c, db_session)
         assert trend == "stable", f"Expected 'stable', got {trend!r}"
 
+    async def test_trend_uses_3_most_recent_not_oldest(self, db_session):
+        """
+        Regression: with 4+ entries, trend must be computed on the 3 most
+        recent rows, not the 3 oldest.
+
+        Setup: oldest entry is green (6.0), then 3 worsening entries
+        (green → amber → red). The oldest entry must be ignored so the
+        trend is 'worsening', not 'stable'.
+        """
+        from app.services.labs import compute_trend
+
+        patient = Patient(cognito_sub=f"test-sub-trend-{uuid.uuid4()}")
+        db_session.add(patient)
+        await db_session.flush()
+
+        today = date.today()
+        # 4 entries oldest → newest: green, green, amber, red
+        for i, val in enumerate(["6.0", "6.5", "8.5", "10.0"]):
+            db_session.add(LabResult(
+                patient_id=patient.id,
+                kind=LabKind.hba1c,
+                value=val,
+                unit=LabUnit.percent,
+                sample_date=today - timedelta(days=(3 - i) * 30),
+            ))
+        await db_session.commit()
+
+        # 3 most recent: green(6.5), amber(8.5), red(10.0) → worsening
+        trend = await compute_trend(patient.id, LabKind.hba1c, db_session)
+        assert trend == "worsening", (
+            f"Expected 'worsening' from the 3 most recent entries, got {trend!r}"
+        )
+
 
 # ── GET /labs/trends HTTP-level test ──────────────────────────────────────────
 

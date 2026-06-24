@@ -136,7 +136,8 @@ async def suggest_alternatives(
     profile = await _load_profile(patient, db)
     excluded = await _load_rejected(patient, db)
     # Build clinical context for diet-lab correlation (Phase 13).
-    # Currently passed to the provider for future prompt enrichment.
+    # Not yet forwarded to suggest_alternatives (provider signature unchanged per
+    # Phase 9 do-not-change); available here for a future phase that extends the prompt.
     _clinical_context = await build_clinical_context(patient.id, db)
 
     alternatives: list[Alternative] = await provider.suggest_alternatives(

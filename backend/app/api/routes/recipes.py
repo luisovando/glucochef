@@ -89,7 +89,7 @@ async def generate_recipe(
 
     return RecipeResponse(
         recipe_id=str(recipe.id),
-        title=raw.get("title", ""),
+        title=recipe.title,
         ingredients=raw.get("ingredients", []),
         steps=raw.get("instructions", []),
         nutrition_summary=raw.get("nutrition_summary"),

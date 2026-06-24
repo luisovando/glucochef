@@ -129,10 +129,11 @@ async def compute_trend(
     result = await session.execute(
         select(LabResult)
         .where(LabResult.patient_id == patient_id, LabResult.kind == kind)
-        .order_by(LabResult.sample_date.asc())
+        .order_by(LabResult.sample_date.desc())
         .limit(3)
     )
-    rows = result.scalars().all()
+    # Reverse so rows are oldest → newest for consecutive-pair comparison.
+    rows = list(reversed(result.scalars().all()))
 
     if len(rows) < 2:
         return "stable"
