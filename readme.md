@@ -76,7 +76,86 @@ El producto apunta a pacientes adultos (18+) con cualquier subtipo de diabetes, 
 > Proporciona imágenes y/o videotutorial mostrando la experiencia del usuario desde que aterriza en la aplicación, pasando por todas las funcionalidades principales.
 
 ### **1.4. Instrucciones de instalación:**
-> Documenta de manera precisa las instrucciones para instalar y poner en marcha el proyecto en local (librerías, backend, frontend, servidor, base de datos, migraciones y semillas de datos, etc.)
+
+#### Requisitos previos
+
+| Herramienta | Versión mínima | Verificar |
+|---|---|---|
+| Python | 3.11 | `python3 --version` |
+| Node.js | 18 | `node --version` |
+| pnpm | 8 | `pnpm --version` |
+| Docker + Docker Compose | 24 | `docker --version` |
+
+#### 1. Clonar el repositorio
+
+```bash
+git clone <repo-url>
+cd glucochef
+```
+
+#### 2. Variables de entorno
+
+Cada capa tiene su propio archivo de configuración:
+
+```bash
+# Credenciales de PostgreSQL para Docker Compose
+cp .env.example .env
+
+# Variables de runtime del backend
+cp backend/.env.example backend/.env
+
+# Variables de runtime del frontend
+cp frontend/.env.example frontend/.env.local
+```
+
+Editar cada archivo y reemplazar los valores `change_me` y `REPLACE_WITH_*` con los valores reales.
+Para la clave de cifrado PHI (Phase 5):
+
+```bash
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+#### 3. Base de datos
+
+```bash
+# Levantar PostgreSQL (usa las credenciales del .env raíz)
+docker compose up -d postgres
+
+# Esperar a que el healthcheck pase (~5 s) y aplicar migraciones
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+alembic upgrade head
+```
+
+#### 4. Backend
+
+```bash
+# Desde backend/ con el .venv activo
+uvicorn app.main:app --reload
+# → http://localhost:8000
+# → http://localhost:8000/docs  (Swagger UI)
+```
+
+#### 5. Frontend
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+# → http://localhost:3000
+```
+
+#### 6. Suite de tests
+
+```bash
+# Backend (desde backend/ con el .venv activo)
+pytest
+
+# Frontend — E2E con Playwright (Phase 23+)
+pnpm exec playwright test
+```
 
 ---
 

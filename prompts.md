@@ -101,6 +101,15 @@ Crea la skill glucochef-c4-architecture con niveles Context y Container requerid
 
 **Prompt 1:**
 
+- **Context**: Phase 5 (PHI encryption + audit logging) is complete. All backend tests pass. The `NutritionalProfile` model and its child tables (`medications`, `allergies`, `intolerances`, `dietary_preferences`) exist, and `RejectedIngredient` is implemented. The `AuditAction` enum currently contains `read`, `write`, and `delete`.
+- **Prompt**:
+  > Execute `@glucochef-phase-executor Phase 6 / AI4-43`. Implement `POST /onboarding` so that it accepts diabetes type, medications, allergies, intolerances, rejected foods, and cultural preferences, persists a `NutritionalProfile`, is protected by `get_current_patient`, and writes audit entries. Follow TDD Red→Green for each acceptance criterion: authenticated POST returns 201 with the profile id; unauthenticated POST returns 401; posting twice for the same patient updates the existing profile instead of duplicating it.
+- **Output**: `backend/app/schemas/onboarding.py`, `backend/app/api/routes/onboarding.py`, registration in `backend/app/main.py`, `backend/tests/test_onboarding.py`, and Alembic migration `e3d89e75cb1c` adding the `consent` value to the `audit_action` enum.
+- **Design notes**:
+  - Explicit consent is enforced by a Pydantic validator on `OnboardingRequest.consent` and recorded on the `Patient` record.
+  - The endpoint writes two audit entries (`write onboarding`, `consent`) in the same transaction as the profile upsert.
+  - Related child rows are replaced explicitly via `delete(...).where(...)` to avoid triggering lazy loads inside the async test client.
+
 **Prompt 2:**
 
 **Prompt 3:**
